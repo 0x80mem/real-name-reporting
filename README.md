@@ -4,4 +4,5 @@
 ```
 - docs: 文档
 - history: 导入数据与日志分析
+- statreport: 数据分析
 ```
