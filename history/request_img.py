@@ -21,6 +21,9 @@ REPLACE_OLD = False
 class ExceptionDiskRunningOut(Exception):
     pass
 
+class ExceptionTimeout(Exception):
+    pass
+
 def check_disk_space(threshold_gb=5):
     """Check if the C drive has more than `threshold_gb` gigabytes free."""
     total, used, free = shutil.disk_usage("C:\\")
@@ -102,8 +105,7 @@ def download_and_request_image():
                             continue
                     pbar.update(1)
                     if time.time() - clock > 60 * 40:
-                        print("Time out")
-                        break
+                        raise ExceptionTimeout
                     if not check_disk_space():
                         raise ExceptionDiskRunningOut
     except Error as e:
@@ -111,6 +113,10 @@ def download_and_request_image():
         traceback.print_exc()
     except ExceptionDiskRunningOut:
         print("Disk running out")
+        request_image(None, None)
+    except ExceptionTimeout:
+        print("Timeout")
+        request_image(None, None)
     except KeyboardInterrupt:
         pass
     except Exception as e:
@@ -120,6 +126,8 @@ def download_and_request_image():
     finally:
         if engine:
             engine.dispose()
+        time.sleep(20)
+        exit()
 
 def main():
     download_and_process_thread = Thread(target=download_and_request_image)
@@ -131,7 +139,8 @@ def main():
     Thread(target=response_image).start()
 
     download_and_process_thread.join()
-    time.sleep(10)
 
 if __name__ == "__main__":
     main()
+
+

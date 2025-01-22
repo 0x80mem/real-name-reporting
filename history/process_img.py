@@ -106,6 +106,8 @@ def response_text_from_image():
     while True:
         try:
             url, image = request_text_from_image_queue.get()
+            if not url:
+                break
             texts = recognize_text_from_image(image)
             response_text_from_image_queue[url].put(texts)
         except KeyboardInterrupt:
@@ -122,6 +124,8 @@ def response_caption_from_image():
     while True:
         try:
             url, image = request_caption_from_image_queue.get()
+            if not url:
+                break
             caption = generate_caption_from_image(image)
             response_caption_from_image_queue[url].put(caption)
         except KeyboardInterrupt:
@@ -138,6 +142,8 @@ def image2sql():
     while True:
         try:
             url = image2sql_queue.get()
+            if not url:
+                break
             with engine.connect() as conn:
                 image_table = Table('image_text', metadata, autoload_with=conn)
                 has_old = conn.execute(image_table.select().where(image_table.c.url == url)).fetchone()
@@ -168,12 +174,14 @@ def response_image():
     while True:
         try:
             url, image = request_image_queue.get()
-            if url not in response_text_from_image_queue:
+            if url and url not in response_text_from_image_queue:
                 response_text_from_image_queue[url] = multiprocessing.Queue(1)
                 response_caption_from_image_queue[url] = multiprocessing.Queue(1)
             request_text_from_image_queue.put((url, image))
             request_caption_from_image_queue.put((url, image))
             image2sql_queue.put(url)
+            if not url:
+                break
         except KeyboardInterrupt:
             break
         except EOFError:

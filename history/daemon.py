@@ -9,4 +9,5 @@ if __name__ == "__main__":
         process.start()
         print(f"{datetime.datetime.now()}: Started request_img.py with PID {process.pid}")
         process.join()
-        time.sleep(10)
+        print(f"{datetime.datetime.now()}: Finished request_img.py with PID {process.pid}")
+        time.sleep(20)
