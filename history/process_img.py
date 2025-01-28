@@ -149,6 +149,8 @@ def image2sql():
                 has_old = conn.execute(image_table.select().where(image_table.c.url == url)).fetchone()
                 texts = response_text_from_image_queue[url].get()
                 caption = response_caption_from_image_queue[url].get()
+                response_text_from_image_queue.pop(url)
+                response_caption_from_image_queue.pop(url)
                 if isinstance(texts, Exception) or isinstance(caption, Exception):
                     continue
 

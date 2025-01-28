@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, MetaData, Table, Column, String, Text, text
+from sqlalchemy import create_engine, MetaData, Table, Column, String, Text, text, exc
 from PIL import UnidentifiedImageError
 from mysql.connector import Error
 from threading import Thread
@@ -72,11 +72,14 @@ def download_and_request_image():
 
         metadata.create_all(engine)
 
+
         # 遍历表 weibo_data
         with engine.connect() as conn:
-            with tqdm.tqdm(total=conn.execute(text("SELECT COUNT(*) FROM weibo_data")).fetchone()[0]) as pbar:
+            total_rows = conn.execute(text("SELECT COUNT(*) FROM weibo_data")).fetchone()[0]
+            result = conn.execution_options(stream_results=True).execute(text("SELECT weibo_image_urls FROM weibo_data")).yield_per(1000)
+            with tqdm.tqdm(total=total_rows) as pbar:
                 pbar.set_description("Processing images")
-                for row in conn.execute(text("SELECT weibo_image_urls FROM weibo_data")):
+                for row in result:
                     if not row[0]:
                         pbar.update(1)
                         continue
@@ -124,6 +127,7 @@ def download_and_request_image():
         traceback.print_exc()
 
     finally:
+        print("Exiting...")
         if engine:
             engine.dispose()
         time.sleep(20)
