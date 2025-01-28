@@ -1,7 +1,9 @@
 import os
 import pandas as pd
+from tqdm import tqdm
+from collections import Counter
 from settings import COLUMN_TRANSLATE
-from drawgraph import drawhist, drawkde, drawwordcloud, drawpie, drawbar
+from drawgraph import drawhist, drawkde, drawwordcloud, drawpie, drawbar, drawline
 
 def createDir(column_data: pd.Series):
     output_dir = f'output/{COLUMN_TRANSLATE[column_data.name]}'
@@ -9,6 +11,16 @@ def createDir(column_data: pd.Series):
     for file in os.listdir(output_dir):
         os.remove(f'{output_dir}/{file}')
     return output_dir
+
+# 合并较小项
+def mergeSmallItems(df: pd.Series, n: int):
+    if len(df) > n:
+        limit = df.head(n - 1).min()
+        other_sum = df[df < limit].sum()
+        df = df[df >= limit]
+        df['其他'] = other_sum
+    return df
+
 
 def describeToFile(df: pd.Series, name, file):
     file.write(f'{name}数量: {len(df)}\n')
@@ -47,21 +59,30 @@ def describeInt(column_data: pd.Series):
 
 def describeListString(column_data: pd.Series):
     output_dir = createDir(column_data)
-    words = column_data.apply(pd.Series).stack()
+    # 使用生成器逐行处理数据
+    def extract_words(series: pd.Series):
+        for words in series:
+            if isinstance(words, list):
+                yield from words
+
+    word_counter = Counter()
+    with tqdm(total=len(column_data)) as pbar:
+        pbar.set_description(f'处理{COLUMN_TRANSLATE[column_data.name]}')
+        for word in extract_words(column_data):
+            word_counter[word] += 1
+            pbar.update(1)
+    words = pd.Series(word_counter)
+    words = words.sort_values(ascending=False)
 
     # 生成描述文件
     with open(f'{output_dir}/describe.txt', 'w') as f:
-        describeToFile(words.value_counts(), COLUMN_TRANSLATE[column_data.name], f)
+        describeToFile(words, COLUMN_TRANSLATE[column_data.name], f)
         
     # 生成词云
     drawwordcloud(words, output_dir, COLUMN_TRANSLATE[column_data.name])
 
     # 合并较小项
-    words = words.value_counts()
-    words = words[words.index.str.len() > 1]
-    limit = words.head(19).min()
-    words['其他'] = words[words < limit].sum()
-    words = words[words >= limit]
+    words = mergeSmallItems(words, 20)
 
     drawbar(words, output_dir, COLUMN_TRANSLATE[column_data.name], '词', '数量', '')
 
@@ -83,13 +104,11 @@ def describeEnum(column_data: pd.Series):
         describeToFile(column_data.value_counts(), COLUMN_TRANSLATE[column_data.name], f)
 
     # 生成词云
-    drawwordcloud(column_data, output_dir, COLUMN_TRANSLATE[column_data.name])
+    enums = column_data.value_counts()
+    drawwordcloud(enums, output_dir, COLUMN_TRANSLATE[column_data.name])
 
     # 合并较小项
-    enums = column_data.value_counts()
-    limit = enums.head(19).min()
-    enums['其他'] = enums[enums < limit].sum()
-    enums = enums[enums >= limit]
+    enums = mergeSmallItems(enums, 20)
 
     # 生成词频图
     drawbar(enums, output_dir, COLUMN_TRANSLATE[column_data.name], '词', '数量', '')
@@ -99,6 +118,47 @@ def describeEnum(column_data: pd.Series):
 
     print(f'{COLUMN_TRANSLATE[column_data.name]}: complete')
 
+def describeLocation(column_data: pd.Series):
+    output_dir = createDir(column_data)
+
+    location_df = pd.DataFrame(index=column_data.index, columns=['城市'])
+    for idx, locations in column_data.items():
+        if locations != None:
+                location_df.at[idx, '城市'] = locations[0]
+
+    # 生成描述文件
+    with open(f'{output_dir}/describe.txt', 'w') as f:
+        describeToFile(location_df['城市'].value_counts(), '城市', f)
+    
+    locations = location_df['城市'].value_counts()
+    drawwordcloud(locations, output_dir, '城市')
+
+    # 合并较小项
+    locations = mergeSmallItems(locations, 15)
+
+    drawbar(locations, output_dir, '城市', '城市', '数量')
+    drawpie(locations, output_dir, '城市', '城市', '占比')
+
+    print(f'{COLUMN_TRANSLATE[column_data.name]}: complete')
+
+def describeDateTime(column_data: pd.Series):
+    output_dir = createDir(column_data)
+
+    if not pd.api.types.is_datetime64_any_dtype(column_data):
+        column_data = pd.to_datetime(column_data)
+    
+    # 按月统计数量
+    counts = column_data.groupby(column_data.dt.to_period("M")).count()
+    counts.index = counts.index.to_timestamp()
+
+    # 生成描述文件
+    with open(f'{output_dir}/describe.txt', 'w') as f:
+        describeToFile(counts, f"{COLUMN_TRANSLATE[column_data.name]}每月", f)
+    drawline(counts, output_dir, COLUMN_TRANSLATE[column_data.name], '年', '每月数量', '折线图', peak_count=3)
+
+    print(f'{COLUMN_TRANSLATE[column_data.name]}: complete')
+
+
 def __describeNone(column_data: pd.Series):
     pass
 
@@ -106,8 +166,8 @@ COLUMN_DESCRIBE = {
     'Int': describeInt,
     'List[String]': describeListString,
     'Text': describeText,
-    'Location': __describeNone,
-    'DateTime': __describeNone,
+    'Location': describeLocation,
+    'DateTime': describeDateTime,
     'Enum': describeEnum,
     'URL': __describeNone,
     'String': __describeNone,

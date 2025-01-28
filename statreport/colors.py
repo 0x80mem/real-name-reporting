@@ -51,6 +51,6 @@ def get_colors(n):
         
 def random_color_func(word, font_size, position, orientation, font_path, random_state):
     ex_colors = expand_colors()
-    dark_colors = [color for color in ex_colors if color.mean() < 0.95]
+    dark_colors = [color for color in ex_colors if color.mean() < 0.9]
     dark_colors = dark_colors[random_state.randint(0, len(dark_colors) - 1)]
     return f"rgb{tuple(map(int, dark_colors * 255))}"

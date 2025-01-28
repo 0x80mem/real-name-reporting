@@ -56,3 +56,8 @@ COLUMN_TRANSLATE = {
     'ip_address': 'IP地址',
     'user_auth': '用户认证'
 }
+
+COLUMN_SERIAL_LIST = [
+    'weibo_content',
+    'topics',
+]

@@ -31,12 +31,18 @@ def praseLocation(column_data):
     if not column_data:
         return None
     locations = jieba.lcut(column_data)
-    return [location for location in locations if location not in stopwords]
+    ret = []
+    for location in locations:
+        if location in stopwords:
+            continue
+        ret.append(location)
+    return ret
 
 def praseDateTime(column_data):
-    if not column_data:
-        return None
-    return datetime.fromtimestamp(column_data.timestamp())
+    return column_data
+    # if not column_data:
+    #     return None
+    # return datetime.fromtimestamp(column_data.timestamp())
         
 def praseColumn(args):
     column, column_type = args

@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, MetaData, Table, Column, String, BIGINT, T
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 from config import db_config
-from settings import COLUMN_TYPE_MAP, COLUMN_IGNORE
+from settings import COLUMN_TYPE_MAP, COLUMN_IGNORE, COLUMN_SERIAL_LIST
 from describe import COLUMN_DESCRIBE
 from describe2 import COLUMN_DESCRIBE_2
 from prase import praseColumn
@@ -48,7 +48,7 @@ def get_df_from_db():
         df = pd.read_sql(query, conn)
 
     # 测试随机抽取10000条数据
-    df = df.sample(n=10000, random_state=1)
+    # df = df.sample(n=10000, random_state=1)
 
     return df
 
@@ -70,11 +70,15 @@ def statSingleColumns(df):
     features = []
 
     for column in df.columns:
-        if column in COLUMN_IGNORE:
+        if column in COLUMN_IGNORE or column in COLUMN_SERIAL_LIST:
             continue
         features.append(pool.submit(COLUMN_DESCRIBE[COLUMN_TYPE_MAP[column]], (df[column])))
     for feature in features:
         feature.result()
+    for column in COLUMN_SERIAL_LIST:
+        if column in COLUMN_IGNORE:
+            continue
+        COLUMN_DESCRIBE[COLUMN_TYPE_MAP[column]](df[column])
     print("statSingleColumns done")
 
 def statTwoColumns(df):
@@ -84,7 +88,8 @@ def statTwoColumns(df):
         for column2 in df.columns:
             if column1 in COLUMN_IGNORE or column2 in COLUMN_IGNORE or column1 == column2:
                 continue
-            features.append(pool.submit(COLUMN_DESCRIBE_2[COLUMN_TYPE_MAP[column1]][COLUMN_TYPE_MAP[column2]], (df[column1], df[column2])))
+            if COLUMN_TYPE_MAP[column2] in COLUMN_DESCRIBE_2[COLUMN_TYPE_MAP[column1]]:
+                features.append(pool.submit(COLUMN_DESCRIBE_2[COLUMN_TYPE_MAP[column1]][COLUMN_TYPE_MAP[column2]], (df[column1], df[column2])))
     for feature in features:
         feature.result()
     print("statTwoColumns done")
